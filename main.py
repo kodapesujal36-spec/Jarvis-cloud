@@ -1,4 +1,6 @@
-import os, threading
+import os
+import asyncio
+import threading
 from flask import Flask
 from telegram.ext import Application, MessageHandler, filters, CommandHandler
 from google import genai
@@ -11,10 +13,10 @@ app_flask = Flask(__name__)
 
 @app_flask.route('/')
 def home():
-    return "Jarvis is Live!"
+    return "Jarvis is Live! 🚀"
 
 async def start(update, context):
-    await update.message.reply_text("Hi! I am Jarvis 🚀")
+    await update.message.reply_text("Hi! I am Jarvis 🚀 How can I help?")
 
 async def chat(update, context):
     try:
@@ -27,13 +29,19 @@ async def chat(update, context):
     except Exception as e:
         await update.message.reply_text(f"Error: {e}")
 
-def run_bot():
+def run_flask():
+    app_flask.run(host="0.0.0.0", port=10000)
+
+async def run_bot():
     application = Application.builder().token(BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
-    application.run_polling(drop_pending_updates=True)
-
-threading.Thread(target=run_bot).start()
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling(drop_pending_updates=True)
+    print("Bot Started!")
+    await asyncio.Event().wait()
 
 if __name__ == "__main__":
-    app_flask.run(host="0.0.0.0", port=10000)
+    threading.Thread(target=run_flask, daemon=True).start()
+    asyncio.run(run_bot())
