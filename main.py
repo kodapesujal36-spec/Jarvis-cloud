@@ -8,9 +8,20 @@ async def chat(update, context):
     for attempt in range(3):
         try:
             print(f"Trying gemini-3.6-flash attempt {attempt+1}")
-            response = client.models.generate_content(
-                model="gemini-3.6-flash",
-                contents=prompt
+            # NEW - PASTE THIS
+MODELS = ["gemini-2.5-flash", "gemini-3.6-flash"]
+
+for model_name in MODELS:
+    try:
+        response = client.models.generate_content(
+            model=model_name,
+            contents=user_message
+        )
+        print(f"Success with {model_name}")
+        break
+    except Exception as e:
+        print(f"Failed {model_name}: {e}")
+        continue
             )
             await update.message.reply_text(response.text)
             return  # Success!
