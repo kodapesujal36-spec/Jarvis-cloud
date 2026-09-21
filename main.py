@@ -22,8 +22,8 @@ async def chat(update, context):
     try:
         prompt = update.message.text
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt
+            
+model = "gemini-2.5-flash"
         )
         await update.message.reply_text(response.text)
     except Exception as e:
