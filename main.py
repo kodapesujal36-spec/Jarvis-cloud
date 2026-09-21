@@ -22,7 +22,7 @@ async def chat(update, context):
     try:
         prompt = update.message.text
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-1.5-flash",
             contents=prompt
         )
         await update.message.reply_text(response.text)
