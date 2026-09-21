@@ -8,7 +8,12 @@ from google import genai
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
-client = genai.Client(api_key=GEMINI_KEY)
+# USE v1 API - This fixes 404 error!
+client = genai.Client(
+    api_key=GEMINI_KEY,
+    http_options={"api_version": "v1"}
+)
+
 app_flask = Flask(__name__)
 
 @app_flask.route('/')
@@ -22,7 +27,7 @@ async def chat(update, context):
     try:
         prompt = update.message.text
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-2.0-flash",  # NEWEST stable model!
             contents=prompt
         )
         await update.message.reply_text(response.text)
