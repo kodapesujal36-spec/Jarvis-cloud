@@ -10,7 +10,7 @@ def run_flask():
  app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
 threading.Thread(target=run_flask, daemon=True).start()
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-flash-latest')
 TOKEN = os.environ.get("BOT_TOKEN")
 async def start(update, context):
  await update.message.reply_text("Hi! I am AI Jarvis 🤖\nAsk anything!")
