@@ -31,4 +31,4 @@ if __name__ == "__main__":
  application = Application.builder().token(TOKEN).build()
  application.add_handler(CommandHandler("start", start))
  application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, ai_reply))
- application.run_polling()
+ application.run_polling(drop_pending_updates=True)
