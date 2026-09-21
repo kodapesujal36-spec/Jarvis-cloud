@@ -1,2 +1,2 @@
 python-telegram-bot==20.7
-google-genai
+google-genai==1.2.0
