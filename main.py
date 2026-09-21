@@ -36,6 +36,8 @@ async def run_bot():
     application = Application.builder().token(BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
+    await application.bot.delete_webhook(drop_pending_updates=True)
+    print("Webhook deleted - Starting polling!")
     await application.initialize()
     await application.start()
     await application.updater.start_polling(drop_pending_updates=True)
