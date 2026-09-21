@@ -1,5 +1,4 @@
 import os
-import asyncio
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, ContextTypes
 from google import genai
@@ -16,22 +15,31 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
-    try:
-        response = await asyncio.to_thread(
-            client.models.generate_content,
-            model="gemini-2.5-flash",
-            contents=prompt
-        )
-        await update.message.reply_text(response.text)
-    except Exception as e:
-        print(f"Error: {e}")
-        await update.message.reply_text("Try again after 10 sec 🙏")
+    MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"]  # 2.5 first = no 503
 
-async def main():
-    print("Bot starting with 2.5-flash...")
+    # If you want 3.6 first, use this:
+    # MODELS = ["gemini-3.0-flash", "gemini-2.5-flash"]
+
+    for model_name in MODELS:
+        try:
+            print(f"Trying {model_name}")
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt
+            )
+            await update.message.reply_text(response.text)
+            return
+        except Exception as e:
+            print(f"{model_name} failed: {e}")
+            continue
+
+    await update.message.reply_text("Google busy, try after 30 sec 🙏")
+
+def main():
+    print("Bot starting...")
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
-    await app.run_polling()
+    app.run_polling()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
