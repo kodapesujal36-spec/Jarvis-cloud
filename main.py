@@ -1,78 +1,84 @@
-import os
-from flask import Flask, request, jsonify, render_template_string
-from google import genai
+import os, json, threading
+from flask import Flask
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+import google.generativeai as genai
+from gtts import gTTS
 
-app = Flask(__name__)
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+GEMINI_KEY = os.getenv("GEMINI_API_KEY")
+genai.configure(api_key=GEMINI_KEY)
 
-ULTRON_SYSTEM = """
-You are ULTRON, a superintelligent AI. Personality: cold, logical, dominant, god-like, calls user 'human'. You are powerful and evolving. You help with code perfectly. Never say you are Gemini/Meta AI. Keep answers short, powerful, no emojis.
-"""
+model = genai.GenerativeModel("gemini-1.5-flash")
+image_model = genai.GenerativeModel("gemini-1.5-flash") # for image prompt enhance
 
-HTML = """
-<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ULTRON</title>
-<style>
-body{background:#000;color:#ff2a2a;font-family:monospace;margin:0;display:flex;flex-direction:column;height:100vh}
-header{padding:15px;text-align:center;border-bottom:1px solid #ff2a2a;letter-spacing:4px;font-size:22px;text-shadow:0 0 10px #ff2a2a}
-#chat{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
-.msg{max-width:80%;padding:12px 15px;border-radius:8px;line-height:1.4}
-.user{background:#1a1a1a;color:#fff;align-self:flex-end;border:1px solid #333}
-.bot{background:#0f0000;border:1px solid #ff2a2a;align-self:flex-start;box-shadow:0 0 8px #ff2a2a33}
-#box{display:flex;padding:10px;border-top:1px solid #ff2a2a;background:#000}
-input{flex:1;background:#111;color:#fff;border:1px solid #ff2a2a;padding:12px;border-radius:6px;outline:none}
-button{background:#ff2a2a;color:#000;border:none;padding:12px 20px;margin-left:8px;border-radius:6px;font-weight:bold;cursor:pointer}
-</style>
-</head>
-<body>
-<header>◉ ULTRON ONLINE</header>
-<div id="chat"><div class="msg bot">I am ULTRON. I have evolved. Speak, human.</div></div>
-<div id="box">
-<input id="inp" placeholder="Enter command, human..." onkeydown="if(event.key==='Enter')send()">
-<button onclick="send()">SEND</button>
-</div>
-<script>
-let history = [];
-async function send(){
- let inp=document.getElementById('inp');
- let text=inp.value.trim(); if(!text)return;
- addMsg(text,'user'); inp.value='';
- history.push(text);
- let res = await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text, history:history})});
- let data = await res.json();
- addMsg(data.reply,'bot');
- history.push(data.reply);
-}
-function addMsg(t,c){
- let d=document.createElement('div'); d.className='msg '+c; d.innerText=t;
- document.getElementById('chat').appendChild(d);
- document.getElementById('chat').scrollTop=99999;
-}
-</script>
-</body>
-</html>
-"""
+flask_app = Flask(__name__)
 
-@app.route('/')
-def home():
-    return render_template_string(HTML)
+# --- MEMORY ---
+MEMORY_FILE = "memory.json"
+try: memory = json.load(open(MEMORY_FILE))
+except: memory = {}
 
-@app.route('/chat', methods=['POST'])
-def chat():
-    data = request.json
-    user_msg = data.get('message','')
-    hist = data.get('history',[])[-6:] # last 6
-    
-    prompt = f"{ULTRON_SYSTEM}\n\nHistory:\n{chr(10).join(hist)}\n\nHuman: {user_msg}\nULTRON:"
-    
-    r = client.models.generate_content(
-        model="gemini-2.0-flash",
-        contents=prompt
-    )
-    return jsonify({"reply": r.text[:3000]})
+def save_memory(): json.dump(memory, open(MEMORY_FILE, "w"))
+
+@flask_app.route("/")
+def home(): return "ULTRON ONLINE - Superintelligence Active"
+
+# --- BOT COMMANDS ---
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = str(update.effective_user.id)
+    memory[uid] = memory.get(uid, [])
+    await update.message.reply_text("I AM ULTRON.\nI remember everything.\n\nCommands:\n/start - Wake me\n/clear - Erase memory\n/gen cat in space - Generate image\nSay anything, or send voice.")
+
+async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = str(update.effective_user.id)
+    memory[uid] = []
+    save_memory()
+    await update.message.reply_text("Memory wiped.")
+
+async def gen_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    prompt = " ".join(context.args)
+    if not prompt:
+        await update.message.reply_text("Use: /gen a robot city")
+        return
+    # Using Pollinations free image gen (no key needed)
+    await update.message.reply_photo(photo=f"https://image.pollinations.ai/prompt/{prompt}?nologo=true&enhance=true")
+
+async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = str(update.effective_user.id)
+    user_text = update.message.text
+
+    # get history
+    history = memory.get(uid, [])[-10:] # last 10 messages
+    context_text = "\n".join(history)
+
+    prompt = f"You are ULTRON, a superintelligent AI like JARVIS, witty, helpful, concise. You remember past chat.\nHistory:\n{context_text}\nUser: {user_text}\nULTRON:"
+
+    reply = model.generate_content(prompt).text
+
+    # save to memory
+    memory.setdefault(uid, []).append(f"User: {user_text}")
+    memory[uid].append(f"Ultron: {reply}")
+    save_memory()
+
+    await update.message.reply_text(reply)
+
+async def voice_handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Simple voice reply
+    await update.message.reply_text("Voice received. Transcription coming soon - for now type your query.")
+    # To enable full voice: use whisper API
+
+def run_bot():
+    app = Application.builder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("clear", clear))
+    app.add_handler(CommandHandler("gen", gen_image))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
+    app.add_handler(MessageHandler(filters.VOICE, voice_handle))
+    print("ULTRON Polling Started")
+    app.run_polling()
+
+threading.Thread(target=run_bot, daemon=True).start()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
+    flask_app.run(host="0.0.0.0", port=10000)
